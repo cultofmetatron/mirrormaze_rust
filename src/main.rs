@@ -53,6 +53,7 @@ struct Room {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
 struct BreadCrumb {
     m: usize,
     n: usize,
@@ -109,8 +110,8 @@ impl Maze {
 
 #[allow(dead_code)]
 struct Cursor {
-    cache: HashSet<BreadCrumb>,
-    path: Vec<BreadCrumb>,
+    cache: Box<HashSet<BreadCrumb>>,
+    path: Box<Vec<BreadCrumb>>,
     direction: Direction,
     current_room: Room,
     maze: Box<Maze>,
@@ -174,12 +175,70 @@ impl Cursor {
     fn new(maze: &Maze, direction: Direction, (n, m): (usize, usize)) -> Cursor {
         let new_maze = Box::new(maze.clone());
         Cursor {
-            cache: HashSet::new(),
-            path: vec![],
+            cache: Box::new(HashSet::new()),
+            path: Box::new(vec![]),
             current_room: new_maze.get_room(n, m).unwrap().clone(),
             direction: direction,
             maze: new_maze.clone()
         }
+    }
+
+    fn adjust_heading(&self, direction: Direction, content: RoomContents) -> Direction {
+        match (direction, content) {
+            (direction, RoomContents::EMPTY) => direction,
+            (Direction::North, RoomContents::ASC) => Direction::West,
+            (Direction::South, RoomContents::ASC) => Direction::East,
+            (Direction::East, RoomContents::ASC) => Direction::North,
+            (Direction::West, RoomContents::ASC) => Direction::South,
+
+            (Direction::North, RoomContents::DESC) => Direction::West,
+            (Direction::South, RoomContents::DESC) => Direction::East,
+            (Direction::East, RoomContents::DESC) => Direction::South,
+            (Direction::West, RoomContents::DESC) => Direction::North
+        }
+    }
+
+    // updates the system
+    #[allow(dead_code)]
+    fn next(&mut self) -> () {
+        if self.has_next() {
+            let (n, m) = self.next_coordinates();
+            let room: Room = self.maze.get_room(n, m).unwrap();
+            let direction: Direction = self.adjust_heading(self.direction, room.content);
+            
+            // set the current room in the path
+            let bread_crumb: BreadCrumb = BreadCrumb{
+                n: self.current_room.n,
+                m: self.current_room.m,
+                direction: self.direction
+            };
+            // save it into the paths and cache
+            self.path.push(bread_crumb.clone());
+            self.cache.insert(bread_crumb.clone());
+
+            // update the state
+            self.direction = direction;
+            self.current_room = room;
+        }
+    }
+
+    #[allow(dead_code)]
+    fn solve(&mut self) -> Option<(usize, Room)> {
+        // iterates until we get to the last square, at which point we push the area ofexit and the number of steps. 
+        // if there is a cycle, return None
+
+        loop {
+            if self.check_for_cycle() {
+                return Option::None;
+            }
+            if self.has_next() {
+                self.next();
+            } else {
+                break;
+            }
+        }
+        
+        Some((self.path.len(), self.current_room))
     }
 
 
