@@ -1,0 +1,8 @@
+[package]
+name = "mirrormaze"
+version = "0.1.0"
+authors = ["Peter de Croos <cultofmetatron@aumlogic.com>"]
+edition = "2018"
+
+[dependencies]
+bloom = "0.2.0"
