@@ -75,6 +75,10 @@ impl PartialEq for BreadCrumb {
 }
 impl Eq for BreadCrumb {}
 
+
+
+
+
 // maze
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -106,6 +110,24 @@ impl Maze {
             }
         }
     }
+
+    #[allow(dead_code)]
+    fn new((m, n): (usize, usize), start_position: (usize, usize), start_direction: Direction, contents: Vec<Room>) -> Maze {
+        // setthe size of the room
+        let mut layout : HashMap<(usize, usize), RoomContents> = HashMap::new();
+        for room in contents.iter() {
+            layout.insert((room.n, room.m), room.content);
+        };
+        // Err(String::from("invalid"))
+        Maze{
+            m_size: m,
+            n_size: n,
+            layout: Box::new(layout),
+            start_direction,
+            start_position
+        }
+    }
+
 }
 
 #[allow(dead_code)]
@@ -239,10 +261,7 @@ impl Cursor {
         }
         
         Some((self.path.len(), self.current_room))
-    }
-
-
-
+    }  
 }
 
 
