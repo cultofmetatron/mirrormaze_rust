@@ -97,6 +97,7 @@ impl Maze {
 
     #[allow(dead_code)]
     fn get_room(&self, n: usize, m: usize) -> Option<Room> {
+        println!("sizes: {:?} on {:?}", (n, m),  (self.n_size, self.m_size));
         if m >= self.m_size || n >= self.n_size {
             return Option::None;
         } else {
@@ -106,13 +107,15 @@ impl Maze {
                     n,
                     content: *content
                 }),
-                Option::None => None
+                Option::None => Option::Some(Room{
+                    m, n, content: RoomContents::EMPTY,
+                })
             }
         }
     }
 
     #[allow(dead_code)]
-    fn new((m, n): (usize, usize), start_position: (usize, usize), start_direction: Direction, contents: Vec<Room>) -> Maze {
+    fn new((n, m): (usize, usize), start_position: (usize, usize), start_direction: Direction, contents: Vec<Room>) -> Maze {
         // setthe size of the room
         let mut layout : HashMap<(usize, usize), RoomContents> = HashMap::new();
         for room in contents.iter() {
@@ -151,17 +154,43 @@ impl Cursor {
         })
     }
     #[allow(dead_code)]
-    fn next_coordinates(&self) -> (usize, usize) {
+    fn next_coordinates(&self) -> Option<(usize, usize)> {
         match self.direction {
-            Direction::North => (self.current_room.n - 1, self.current_room.m),
-            Direction::South => (self.current_room.n + 1, self.current_room.m),
-            Direction::East  => (self.current_room.n, self.current_room.m + 1),
-            Direction::West  => (self.current_room.n, self.current_room.m - 1)
+            Direction::North => {
+                if self.current_room.n == 0 {
+                    return Option::None;
+                } else {
+                    return Option::Some((self.current_room.n - 1, self.current_room.m));
+                }
+            },
+            Direction::South => {
+                if self.current_room.n >= self.maze.n_size {
+                    return Option::None;
+                } else {
+                    return Option::Some((self.current_room.n + 1, self.current_room.m));
+                }
+            },
+            Direction::East  => {
+                if self.current_room.m >= self.maze.m_size {
+                    return Option::None;
+                } else {
+                    return Option::Some((self.current_room.n, self.current_room.m + 1));
+                }
+                
+            },
+            Direction::West  => {
+                if self.current_room.m == 0 {
+                    return Option::None;
+                } else {
+                    return Option::Some((self.current_room.n, self.current_room.m - 1));
+                }
+            }
         }
     }
     #[allow(dead_code)]
     fn out_of_bounds(&self, (n, m): (usize, usize)) -> bool {
         // let (n, m): (usize, usize) = next;
+        println!("bounds: ({:?}) of ({:?})", (n, m), (self.maze.m_size, self.maze.n_size));
         if m >= self.maze.m_size || n >= self.maze.n_size {
             return true;
         } else {
@@ -172,35 +201,46 @@ impl Cursor {
     #[allow(dead_code)]
     fn has_next(&self) -> bool {
         // returns true if the next square is outside the bounds of the room
-        let next_coordinates = self.next_coordinates();
-        self.out_of_bounds(next_coordinates)
+        match self.next_coordinates() {
+            Some(coordinates) => true,
+            None => false
+        }
     }
 
     #[allow(dead_code)]
     fn iterate(&mut self) -> &Cursor {
-        if self.has_next() {
-            let (n, m) = self.next_coordinates();
-            let maze = self.maze.clone();
-            match maze.get_room(n, m) {
-                Option::None => {
+        match self.next_coordinates() {
+            Some((n, m)) => {
+                let maze = self.maze.clone();
+                match maze.get_room(n, m) {
+                    Option::None => {
 
-                },
-                Option::Some(room) => {
-                    self.current_room = room;
+                    },
+                    Option::Some(room) => {
+                        self.current_room = room;
+                    }
                 }
+            },
+            None => {
+
             }
         };
         self
     }
 
     #[allow(dead_code)]
-    fn new(maze: &Maze, direction: Direction, (n, m): (usize, usize)) -> Cursor {
+    fn new(maze: &Maze) -> Cursor {
         let new_maze = Box::new(maze.clone());
+        let (n, m) = new_maze.start_position;
         Cursor {
             cache: Box::new(HashSet::new()),
             path: Box::new(vec![]),
-            current_room: new_maze.get_room(n, m).unwrap().clone(),
-            direction: direction,
+            current_room: new_maze.get_room(n, m).unwrap_or(Room{
+                m,
+                n,
+                content: RoomContents::EMPTY,
+            }),
+            direction: new_maze.start_direction,
             maze: new_maze.clone()
         }
     }
@@ -208,8 +248,8 @@ impl Cursor {
     fn adjust_heading(&self, direction: Direction, content: RoomContents) -> Direction {
         match (direction, content) {
             (direction, RoomContents::EMPTY) => direction,
-            (Direction::North, RoomContents::ASC) => Direction::West,
-            (Direction::South, RoomContents::ASC) => Direction::East,
+            (Direction::North, RoomContents::ASC) => Direction::East,
+            (Direction::South, RoomContents::ASC) => Direction::West,
             (Direction::East, RoomContents::ASC) => Direction::North,
             (Direction::West, RoomContents::ASC) => Direction::South,
 
@@ -223,25 +263,32 @@ impl Cursor {
     // updates the system
     #[allow(dead_code)]
     fn next(&mut self) -> () {
-        if self.has_next() {
-            let (n, m) = self.next_coordinates();
-            let room: Room = self.maze.get_room(n, m).unwrap();
-            let direction: Direction = self.adjust_heading(self.direction, room.content);
-            
-            // set the current room in the path
-            let bread_crumb: BreadCrumb = BreadCrumb{
-                n: self.current_room.n,
-                m: self.current_room.m,
-                direction: self.direction
-            };
-            // save it into the paths and cache
-            self.path.push(bread_crumb.clone());
-            self.cache.insert(bread_crumb.clone());
+        match self.next_coordinates() {
+            Some((n, m)) => {
+                // let maze = self.maze.clone();
+                println!("next code: {:?}", (n, m));
+                let room: Room = self.maze.get_room(n, m).unwrap();
+                let direction: Direction = self.adjust_heading(self.direction, room.content);
+                
+                // set the current room in the path
+                let bread_crumb: BreadCrumb = BreadCrumb{
+                    n: self.current_room.n,
+                    m: self.current_room.m,
+                    direction: self.direction
+                };
+                // save it into the paths and cache
+                println!("pushing breadcrumb: {:?}", bread_crumb);
+                self.path.push(bread_crumb.clone());
+                self.cache.insert(bread_crumb.clone());
 
-            // update the state
-            self.direction = direction;
-            self.current_room = room;
-        }
+                // update the state
+                self.direction = direction;
+                self.current_room = room;
+            },
+            None => {
+
+            }
+        };
     }
 
     #[allow(dead_code)]
@@ -250,12 +297,16 @@ impl Cursor {
         // if there is a cycle, return None
 
         loop {
+            println!("starting the loop");
             if self.check_for_cycle() {
+                println!("found cycle");
                 return Option::None;
             }
             if self.has_next() {
+                println!("iterating loop");
                 self.next();
             } else {
+                println!("breaking loop");
                 break;
             }
         }
@@ -268,6 +319,46 @@ impl Cursor {
 
 fn main() {
     println!("Hello, world!");
+    let mut rooms: Vec<Room> = vec![];
 
+    /*
+        3, 4 E
+        0 0 0 0 0
+        0 0 / 0 /
+        0 0 0 0 0
+        0 0 \ 0 0
+
+
+    */
+
+    rooms.push(
+        Room{
+        m: 2,
+        n: 1,
+        content: RoomContents::ASC,
+    });
+    rooms.push(
+        Room{
+        m: 4,
+        n: 1,
+        content: RoomContents::ASC,
+    });
+    rooms.push(
+        Room{
+        m: 2,
+        n: 3,
+        content: RoomContents::DESC,
+    });
+
+    let maze: Maze = Maze::new((4, 5), (3, 4), Direction::West, rooms);
+    let mut cursor: Cursor = Cursor::new(&maze);
+    match cursor.solve() {
+        Some((steps, room)) => {
+            println!("{} steps, {:?}", steps, room);
+        },
+        None => {
+            println!("no solution");
+        }
+    }
 
 }
