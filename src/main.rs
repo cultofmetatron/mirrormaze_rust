@@ -1,11 +1,11 @@
 /*
 
 this mirror maze consists of an array of values in an m x n matrix
-
+n, m, E
 0 0 / 0 \ 0
 0 0 / 0 0 0
 0 0 0 0 0 0
-0 E 0 0 / 0
+0 0 0 0 / 0
 0 0 0 0 0 0
 
 (0, 0) ----------> (0, m)
@@ -268,5 +268,6 @@ impl Cursor {
 
 fn main() {
     println!("Hello, world!");
+
 
 }
